@@ -1,5 +1,54 @@
+package parser
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+)
+
+type RequestLine struct {
+	Method  []byte
+	Target  []byte
+	Version []byte
+}
+
+type Headers struct {
+	Headers map[string]string
+}
+
+type Body struct {
+	content_length int
+	Body           []byte
+}
+
+type Request struct {
+	State       ParserState
+	RequestLine RequestLine
+	Headers     Headers
+	Body        Body
+}
+
+type ParserState string
+
+const (
+	ParserError   ParserState = "Error"
+	parserInit    ParserState = "Init"
+	parserDone    ParserState = "Done"
+	parserRL      ParserState = "Request Line"
+	parserHeaders ParserState = "Request Headers"
+	parserBody    ParserState = "Request Body"
+)
+
+var RN = []byte("\r\n")
+var RNRN = []byte("\r\n\r\n")
+var SP = []byte(" ")
+
+func newRequest() *Request {
+	return &Request{}
+}
 
 // request-line   = method SP request-target SP HTTP-version
+func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
 	n := bytes.Index(rl, SP)
 	if n == -1 {
 		r.State = ParserError
@@ -42,6 +91,7 @@
 		Target:  target,
 		Version: version,
 	}, nil
+}
 
 func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
 	http, v, ok := bytes.Cut(v, []byte("/"))
@@ -59,4 +109,51 @@ func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
 	}
 
 	return fmt.Appendf(nil, "%s/%d", http, v), nil
+}
+
+// set the content_length
+func (r *Request) ParseHeaders([]byte) *Headers {
+	return nil
+}
+
+func (r *Request) ParseBody([]byte) *Body {
+	return nil
+}
+
+func ParseRequest(req io.Reader) (*Request, error) {
+	// TODO: as of now, we are reading all the data at once, we
+	// can be more efficient by reading in chunks until we hit a  or a "\r\n\r\n"
+	r := newRequest()
+	buff, err := io.ReadAll(req)
+
+	// while the req has data in it, read data []byte slices in to it.
+	if err != nil {
+		r.State = ParserError
+		return nil, fmt.Errorf("Error: %s", err)
+	}
+
+	n := bytes.Index(buff, RN)
+	n += len(RN)
+	rl, err := r.ParseRequestLine(buff[n:])
+	if err != nil {
+		r.State = ParserError
+		return nil, fmt.Errorf("Error: %s", err)
+	}
+	r.State = parserRL
+
+	n = bytes.Index(buff[n:], RNRN)
+	n += len(RNRN)
+	headers := r.ParseHeaders(buff[n:])
+	r.State = parserHeaders
+
+	n = bytes.Index(buff[n:], RN)
+	n += len(RN)
+	body := r.ParseBody(buff[n:])
+	r.State = parserBody
+
+	return &Request{
+		RequestLine: *rl,
+		Headers:     *headers,
+		Body:        *body,
+	}, nil
 }
