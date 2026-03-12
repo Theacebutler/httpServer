@@ -108,7 +108,7 @@ func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
 		}
 	}
 
-	return fmt.Appendf(nil, "%s/%d", http, v), nil
+	return fmt.Appendf(nil, "%s/%s", http, v), nil
 }
 
 // set the content_length
