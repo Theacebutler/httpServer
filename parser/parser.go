@@ -41,9 +41,13 @@ const (
 	parserBody    ParserState = "Request Body"
 )
 
+var ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE = fmt.Errorf("Request line parser Error: No empty space found in request line")
+var ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD = fmt.Errorf("Request line parser Error: No empty space allowed before the METHOD")
+var ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_TARGET = fmt.Errorf("Request line parser Error: No empty space allowed before the TARGET")
 var ERROR_INVALID_HTTP_VERSION = fmt.Errorf("Request line parser Error: Invelid version")
 var ERROR_HEADER_KEY_WITH_WHITESPACE = fmt.Errorf("Header parser Error: No white space allowed in header key")
 var ERROR_HEADER_NO_SEMICOLON = fmt.Errorf("Header parser error: No semicolon found in header")
+
 var RN = []byte("\r\n")
 var RNRN = []byte("\r\n\r\n")
 var SP = []byte(" ")
@@ -116,9 +120,90 @@ func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
 	return fmt.Appendf(nil, "%s/%s", http, v), nil
 }
 
+func newHerders() *Headers {
+	return &Headers{
+		Headers: map[string]string{},
+	}
+}
+
+func (h *Headers) Get(key string) (string, error) {
+	v := h.Headers[strings.ToLower(key)]
+	if len(v) == 0 {
+		return "", fmt.Errorf("Key '%s' not found", key)
+	}
+	return v, nil
+}
+
+func (h *Headers) Set(k []byte, v []byte) {
+	key, value := string(k), string(v)
+	key = strings.ToLower(key)
+	value = strings.TrimSpace(value)
+	old, err := h.Get(key)
+	if err != nil {
+		h.Headers[key] = value
+		return
+	}
+	h.Headers[key] = fmt.Sprintf("%s,%s", old, value)
+}
+
+func (h *Headers) Delete(key string) {
+	key = strings.ToLower(key)
+	_, err := h.Get(key)
+	if err != nil {
+		return
+	}
+	delete(h.Headers, key)
+}
+
+func (h *Headers) Replace(key string, value string) {
+	key = strings.ToLower(key)
+	value = strings.TrimSpace(value)
+	h.Headers[key] = value
+}
+func (h *Headers) Pairs() map[string]string {
+	m := map[string]string{}
+	maps.Copy(m, h.Headers)
+	return m
+}
+
 // set the content_length
-func (r *Request) ParseHeaders([]byte) *Headers {
-	return nil
+func (r *Request) ParseHeaders(b []byte) (*Headers, error) {
+	// field-line   = field-name ":" OWS field-value OWS
+	read := 0
+	idx := 0
+	header := []byte{}
+	headers := newHerders()
+	var err error = nil
+
+	for {
+		idx = bytes.Index(b[read:], RN)
+		if idx == -1 {
+			err = fmt.Errorf("idx == -1")
+			break
+		}
+		if idx == 0 {
+			break
+		}
+		header = b[read : read+idx]
+		key, value, ok := bytes.Cut(header, []byte(":"))
+		if !ok {
+			err = ERROR_HEADER_NO_SEMICOLON
+			break
+		}
+
+		if bytes.Contains(key, SP) {
+			r.State = ParserError
+			err = ERROR_HEADER_KEY_WITH_WHITESPACE
+			break
+		}
+		headers.Set(key, value)
+		read += idx + len(RN)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return headers, err
 }
 
 func (r *Request) ParseBody([]byte) *Body {
@@ -131,10 +216,9 @@ func ParseRequest(req io.Reader) (*Request, error) {
 	r := newRequest()
 	buff, err := io.ReadAll(req)
 
-	// while the req has data in it, read data []byte slices in to it.
 	if err != nil {
 		r.State = ParserError
-		return nil, fmt.Errorf("Error: %s", err)
+		return nil, err
 	}
 
 	n := bytes.Index(buff, RN)
@@ -142,15 +226,17 @@ func ParseRequest(req io.Reader) (*Request, error) {
 	rl, err := r.ParseRequestLine(buff[n:])
 	if err != nil {
 		r.State = ParserError
-		return nil, fmt.Errorf("Error: %s", err)
+		return nil, err
 	}
 	r.State = parserRL
 
-	n = bytes.Index(buff[n:], RNRN)
-	n += len(RNRN)
-	headers := r.ParseHeaders(buff[n:])
+	// Headers
+	h_idx := bytes.Index(buff[n:], RNRN)
+	h_idx += len(RNRN)
+	headers, err := r.ParseHeaders(buff[n+h_idx:])
 	r.State = parserHeaders
 
+	// Body
 	n = bytes.Index(buff[n:], RN)
 	n += len(RN)
 	body := r.ParseBody(buff[n:])
