@@ -48,7 +48,7 @@ var ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE = fmt.Errorf("Request line parser Error
 var ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD = fmt.Errorf("Request line parser Error: No empty space allowed before the METHOD")
 var ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_TARGET = fmt.Errorf("Request line parser Error: No empty space allowed before the TARGET")
 var ERROR_INVALID_HTTP_VERSION = fmt.Errorf("Request line parser Error: Invalid version")
-var ERROR_HEADER_KEY_WITH_WHITESPACE = fmt.Errorf("Header parser Error: No white space allowed in header key")
+var ERROR_INVALID_HEADER_KEY = fmt.Errorf("Header parser Error: Invalid header key")
 var ERROR_HEADER_NO_SEMICOLON = fmt.Errorf("Header parser error: No semicolon found in header")
 
 var RN = []byte("\r\n")
@@ -198,7 +198,7 @@ func (r *Request) ParseHeaders(b []byte) (*Headers, error) {
 
 		if bytes.Contains(key, SP) {
 			r.State = ParserError
-			err = ERROR_HEADER_KEY_WITH_WHITESPACE
+			err = ERROR_INVALID_HEADER_KEY
 			break
 		}
 		headers.Set(key, value)

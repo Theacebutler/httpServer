@@ -115,7 +115,7 @@ func TestHeadersParsing(t *testing.T) {
 		{
 			name:    "Invalid header (space in key)",
 			input:   "Content Length: 18\r\n\r\n",
-			wantErr: ERROR_HEADER_KEY_WITH_WHITESPACE,
+			wantErr: ERROR_INVALID_HEADER_KEY,
 		},
 		{
 			name:    "Invalid header (no colon)",
