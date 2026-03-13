@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,4 +64,23 @@ func TestHeadersParsing(t *testing.T) {
 
 }
 
-// func TestRequestParsing(t *testing.T)
+func TestRequestParsing(t *testing.T) {
+	body, err := r.ParseBody([]byte("this is some request body to test..."))
+	require.NoError(t, err)
+	assert.Equal(t, len([]byte("this is some request body to test...")), body.ContentLength)
+	assert.Equal(t, string("this is some request body to test..."), string(body.Body))
+}
+
+func TestMain(t *testing.T) {
+	req := []byte("GET /foobar HTTP/1.1\r\ncontent-length: 18   \r\nContent-type: image/mp4\r\nfoo:bar\r\n\r\nthis is some request body to test...if it fails, sing somebody save me, it will help(your mood, not the test 😭  \r\n")
+
+	buff := bytes.NewReader(req)
+	rq, err := ParseRequest(buff)
+	require.NoError(t, err)
+	assert.Equal(t, "GET", string(rq.RequestLine.Method))
+	assert.Equal(t, "HTTP/1.1", string(rq.RequestLine.Version))
+	cl, _ := rq.Headers.Get("content-length")
+	foo, _ := rq.Headers.Get("foo")
+	assert.Equal(t, "bar", string(foo))
+	assert.NotEqual(t, 0, string(cl))
+}
