@@ -105,7 +105,7 @@ func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
 
 func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
 	http, v, ok := bytes.Cut(v, []byte("/"))
-	if !ok || http == nil || v == nil {
+	if !ok || len(http) == 0 || len(v) == 0 {
 		return nil, ERROR_INVALID_HTTP_VERSION
 	}
 
