@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"strconv"
 	"strings"
 )
 
@@ -19,8 +20,8 @@ type Headers struct {
 }
 
 type Body struct {
-	content_length int
-	Body           []byte
+	ContentLength int
+	Body          []byte
 }
 
 type Request struct {
@@ -206,8 +207,20 @@ func (r *Request) ParseHeaders(b []byte) (*Headers, error) {
 	return headers, err
 }
 
-func (r *Request) ParseBody([]byte) *Body {
-	return nil
+func (r *Request) ParseBody(b []byte) (*Body, error) {
+	ln := len(b)
+	return &Body{
+		Body:          b,
+		ContentLength: ln,
+	}, nil
+}
+
+func toInt(s string) (int, error) {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return -1, err
+	}
+	return i, nil
 }
 
 func ParseRequest(req io.Reader) (*Request, error) {
