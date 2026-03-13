@@ -236,7 +236,7 @@ func ParseRequest(req io.Reader) (*Request, error) {
 
 	n := bytes.Index(buff, RN)
 	n += len(RN)
-	rl, err := r.ParseRequestLine(buff[n:])
+	rl, err := r.ParseRequestLine(buff[:n])
 	if err != nil {
 		r.State = ParserError
 		return nil, err
@@ -246,13 +246,29 @@ func ParseRequest(req io.Reader) (*Request, error) {
 	// Headers
 	h_idx := bytes.Index(buff[n:], RNRN)
 	h_idx += len(RNRN)
-	headers, err := r.ParseHeaders(buff[n+h_idx:])
+	headers, err := r.ParseHeaders(buff[n : n+h_idx])
+	cl, ok := headers.Get("content-length")
+	if ok != nil {
+		r.Body.ContentLength = 0
+	}
+	i, converr := toInt(cl)
+	if converr != nil {
+		r.State = ParserError
+		return nil, fmt.Errorf("Cant get content length: %s", converr)
+	}
+	r.Body.ContentLength = i
+	if err != nil {
+		return nil, err
+	}
 	r.State = parserHeaders
 
 	// Body
 	n = bytes.Index(buff[n:], RN)
 	n += len(RN)
-	body := r.ParseBody(buff[n:])
+	body, err := r.ParseBody(buff[n:])
+	if err != nil {
+		return nil, err
+	}
 	r.State = parserBody
 
 	return &Request{
