@@ -42,10 +42,12 @@ const (
 	parserBody    ParserState = "Request Body"
 )
 
+var ERROR_PREQUEST_LINE_NO_INPUT = fmt.Errorf("Request line parser error: no input")
+var ERROR_BAD_PREQUEST_LINE = fmt.Errorf("Request line parser error: bad request line")
 var ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE = fmt.Errorf("Request line parser Error: No empty space found in request line")
 var ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD = fmt.Errorf("Request line parser Error: No empty space allowed before the METHOD")
 var ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_TARGET = fmt.Errorf("Request line parser Error: No empty space allowed before the TARGET")
-var ERROR_INVALID_HTTP_VERSION = fmt.Errorf("Request line parser Error: Invelid version")
+var ERROR_INVALID_HTTP_VERSION = fmt.Errorf("Request line parser Error: Invalid version")
 var ERROR_HEADER_KEY_WITH_WHITESPACE = fmt.Errorf("Header parser Error: No white space allowed in header key")
 var ERROR_HEADER_NO_SEMICOLON = fmt.Errorf("Header parser error: No semicolon found in header")
 
@@ -65,6 +67,10 @@ func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
 		return nil, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
 	}
 	// DEBUG: read up to n, where method_idx is the idx of the first SP
+	if n == 0 {
+		r.State = ParserError
+		return nil, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
+	}
 	method := rl[:n]
 	n += len(SP)
 	if bytes.HasPrefix(method, SP) {
@@ -235,6 +241,10 @@ func ParseRequest(req io.Reader) (*Request, error) {
 	}
 
 	n := bytes.Index(buff, RN)
+	if n == -1 {
+		r.State = ParserError
+		return nil, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
+	}
 	n += len(RN)
 	rl, err := r.ParseRequestLine(buff[:n])
 	if err != nil {
@@ -243,37 +253,44 @@ func ParseRequest(req io.Reader) (*Request, error) {
 	}
 	r.State = parserRL
 
+	r.RequestLine = *rl
 	// Headers
 	h_idx := bytes.Index(buff[n:], RNRN)
-	h_idx += len(RNRN)
-	headers, err := r.ParseHeaders(buff[n : n+h_idx])
-	cl, ok := headers.Get("content-length")
-	if ok != nil {
-		r.Body.ContentLength = 0
-	}
-	i, converr := toInt(cl)
-	if converr != nil {
+	if h_idx == -1 {
 		r.State = ParserError
-		return nil, fmt.Errorf("Cant get content length: %s", converr)
+		return nil, fmt.Errorf("headers not terminated by RNRN")
 	}
-	r.Body.ContentLength = i
+
+	headers, err := r.ParseHeaders(buff[n : n+h_idx+len(RNRN)])
 	if err != nil {
+		r.State = ParserError
 		return nil, err
 	}
 	r.State = parserHeaders
 
-	// Body
-	n = bytes.Index(buff[n:], RN)
-	n += len(RN)
-	body, err := r.ParseBody(buff[n:])
-	if err != nil {
-		return nil, err
+	cl, err := headers.Get("content-length")
+	if err == nil {
+		i, converr := toInt(cl)
+		if converr != nil {
+			r.State = ParserError
+			return nil, fmt.Errorf("Cant get content length: %s", converr)
+		}
+		r.Body.ContentLength = i
+	} else {
+		r.Body.ContentLength = 0
 	}
-	r.State = parserBody
+	r.Headers = *headers
+	// Body
+	if r.Body.ContentLength != 0 {
+		bodyStart := n + h_idx + len(RNRN)
+		body, err := r.ParseBody(buff[bodyStart:])
+		if err != nil {
+			r.State = ParserError
+			return nil, err
+		}
+		r.Body = *body
+	}
+	r.State = parserDone
 
-	return &Request{
-		RequestLine: *rl,
-		Headers:     *headers,
-		Body:        *body,
-	}, nil
+	return r, nil
 }
