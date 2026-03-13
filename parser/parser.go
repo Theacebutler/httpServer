@@ -66,7 +66,6 @@ func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
 		r.State = ParserError
 		return nil, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
 	}
-	// DEBUG: read up to n, where method_idx is the idx of the first SP
 	if n == 0 {
 		r.State = ParserError
 		return nil, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
@@ -79,7 +78,6 @@ func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
 	}
 	method = bytes.ToUpper(method)
 
-	// DEBUG: read from n to the end and find the next idx of SP, target_idx is the idx of the next SP
 	target_idx := bytes.Index(rl[n:], SP)
 	if target_idx == -1 {
 		r.State = ParserError
@@ -252,7 +250,6 @@ func ParseRequest(req io.Reader) (*Request, error) {
 		return nil, err
 	}
 	r.State = parserRL
-
 	r.RequestLine = *rl
 	// Headers
 	h_idx := bytes.Index(buff[n:], RNRN)

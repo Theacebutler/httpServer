@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"log/slog"
 	"strings"
 	"testing"
 
@@ -220,9 +219,6 @@ func TestParseVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			got, err := rl.ParseVersion([]byte(tt.input))
-			if tt.want != string(got) {
-				slog.Info("TestRequestLineParsing#DEBUG", "input", tt.input, "want", tt.want, "got", string(got), "err", err)
-			}
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
