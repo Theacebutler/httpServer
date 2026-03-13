@@ -122,6 +122,16 @@ func TestHeadersParsing(t *testing.T) {
 			input:   "InvalidHeaderLine\r\n\r\n",
 			wantErr: ERROR_HEADER_NO_SEMICOLON,
 		},
+		{
+			name:    "Invalid header (Invalid chars)",
+			input:   "Conte🚫t-Length: 18\r\n\r\n",
+			wantErr: ERROR_INVALID_HEADER_KEY,
+		},
+		{
+			name:    "Invalid header (short header key)",
+			input:   "C: 18\r\n\r\n",
+			wantErr: ERROR_INVALID_HEADER_KEY,
+		},
 	}
 
 	for _, tt := range tests {

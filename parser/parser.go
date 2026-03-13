@@ -171,6 +171,27 @@ func (h *Headers) Pairs() map[string]string {
 	return m
 }
 
+func validKey(b []byte) error {
+	good := false
+	if len(b) < 2 {
+		return ERROR_INVALID_HEADER_KEY
+	}
+	for _, char := range b {
+		good = false
+		switch char {
+		case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+			good = true
+		}
+		if char >= 'A' && char <= 'Z' || char >= 'a' && char <= 'z' || char >= '0' && char <= '9' {
+			good = true
+		}
+		if !good {
+			return ERROR_INVALID_HEADER_KEY
+		}
+	}
+	return nil
+}
+
 // set the content_length
 func (r *Request) ParseHeaders(b []byte) (*Headers, error) {
 	// field-line   = field-name ":" OWS field-value OWS
@@ -202,6 +223,10 @@ func (r *Request) ParseHeaders(b []byte) (*Headers, error) {
 			break
 		}
 		headers.Set(key, value)
+		err = validKey(key)
+		if err != nil {
+			return nil, ERROR_INVALID_HEADER_KEY
+		}
 		read += idx + len(RN)
 	}
 	if err != nil {
