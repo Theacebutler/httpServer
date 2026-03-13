@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
+	"strings"
 )
 
 type RequestLine struct {
@@ -39,6 +41,9 @@ const (
 	parserBody    ParserState = "Request Body"
 )
 
+var ERROR_INVALID_HTTP_VERSION = fmt.Errorf("Request line parser Error: Invelid version")
+var ERROR_HEADER_KEY_WITH_WHITESPACE = fmt.Errorf("Header parser Error: No white space allowed in header key")
+var ERROR_HEADER_NO_SEMICOLON = fmt.Errorf("Header parser error: No semicolon found in header")
 var RN = []byte("\r\n")
 var RNRN = []byte("\r\n\r\n")
 var SP = []byte(" ")
@@ -52,14 +57,14 @@ func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
 	n := bytes.Index(rl, SP)
 	if n == -1 {
 		r.State = ParserError
-		return nil, fmt.Errorf("Request line parser Error: No empty space found in request line")
+		return nil, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
 	}
 	// DEBUG: read up to n, where method_idx is the idx of the first SP
 	method := rl[:n]
 	n += len(SP)
 	if bytes.HasPrefix(method, SP) {
 		r.State = ParserError
-		return nil, fmt.Errorf("Request line parser Error: No empty space allowed before the METHOD")
+		return nil, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
 	}
 	method = bytes.ToUpper(method)
 
@@ -67,19 +72,19 @@ func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
 	target_idx := bytes.Index(rl[n:], SP)
 	if target_idx == -1 {
 		r.State = ParserError
-		return nil, fmt.Errorf("Request line parser Error: No empty space found in request line")
+		return nil, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
 	}
 	target := rl[n : target_idx+n]
 	if len(target) < 1 {
 		r.State = ParserError
-		return nil, fmt.Errorf("Request line parser Error: No empty space allowed before the request-target")
+		return nil, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_TARGET
 	}
 	after_target_idx := target_idx + n + len(SP)
 
 	version_idx := bytes.Index(rl[after_target_idx:], RN)
 	if version_idx == -1 {
 		r.State = ParserError
-		return nil, fmt.Errorf("Request line parser Error: Invelid version")
+		return nil, ERROR_INVALID_HTTP_VERSION
 	}
 	version, err := r.RequestLine.ParseVersion(rl[after_target_idx : after_target_idx+version_idx])
 	if err != nil {
@@ -96,7 +101,7 @@ func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
 func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
 	http, v, ok := bytes.Cut(v, []byte("/"))
 	if !ok || http == nil || v == nil {
-		return nil, fmt.Errorf("Cant parse HTTP-version")
+		return nil, ERROR_INVALID_HTTP_VERSION
 	}
 
 	for _, x := range v {
@@ -104,7 +109,7 @@ func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
 			continue
 		}
 		if x > '9' || x < '0' {
-			return nil, fmt.Errorf("Cant parse HTTP-version number")
+			return nil, ERROR_INVALID_HTTP_VERSION
 		}
 	}
 
