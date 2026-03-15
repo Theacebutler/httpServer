@@ -255,6 +255,9 @@ func toInt(s string) (int, error) {
 func ParseRequest(req io.Reader) (*Request, error) {
 	// TODO: as of now, we are reading all the data at once, we
 	// can be more efficient by reading in chunks until we hit a  or a "\r\n\r\n"
+	// so we want to make the ParseRequest method able to get data, check if it has all
+	// it needs in order to parse it, if so - send a signel to not get any more data and start parsing,
+	// if not, instaed of return an error - ask for more data.
 	r := newRequest()
 	buff, err := io.ReadAll(req)
 
