@@ -120,7 +120,7 @@ func TestHeadersParsing(t *testing.T) {
 		{
 			name:    "Invalid header (no colon)",
 			input:   "InvalidHeaderLine\r\n\r\n",
-			wantErr: ERROR_HEADER_NO_SEMICOLON,
+			wantErr: ERROR_HEADER_NO_COLON,
 		},
 		{
 			name:    "Invalid header (Invalid chars)",
