@@ -60,51 +60,51 @@ func newRequest() *Request {
 }
 
 // request-line   = method SP request-target SP HTTP-version
-func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, error) {
+func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, int, error) {
 	n := bytes.Index(rl, SP)
 	if n == -1 {
 		r.State = ParserError
-		return nil, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
+		return nil, 0, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
 	}
 	if n == 0 {
 		r.State = ParserError
-		return nil, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
+		return nil, 0, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
 	}
 	method := rl[:n]
 	n += len(SP)
 	if bytes.HasPrefix(method, SP) {
 		r.State = ParserError
-		return nil, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
+		return nil, 0, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
 	}
 	method = bytes.ToUpper(method)
 
 	target_idx := bytes.Index(rl[n:], SP)
 	if target_idx == -1 {
 		r.State = ParserError
-		return nil, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
+		return nil, 0, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
 	}
 	target := rl[n : target_idx+n]
 	if len(target) < 1 {
 		r.State = ParserError
-		return nil, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_TARGET
+		return nil, 0, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_TARGET
 	}
 	after_target_idx := target_idx + n + len(SP)
 
 	version_idx := bytes.Index(rl[after_target_idx:], RN)
 	if version_idx == -1 {
 		r.State = ParserError
-		return nil, ERROR_INVALID_HTTP_VERSION
+		return nil, 0, ERROR_INVALID_HTTP_VERSION
 	}
 	version, err := r.RequestLine.ParseVersion(rl[after_target_idx : after_target_idx+version_idx])
 	if err != nil {
 		r.State = ParserError
-		return nil, err
+		return nil, 0, err
 	}
 	return &RequestLine{
 		Method:  method,
 		Target:  target,
 		Version: version,
-	}, nil
+	}, n, nil
 }
 
 func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
@@ -193,24 +193,24 @@ func validKey(b []byte) error {
 }
 
 // set the content_length
-func (r *Request) ParseHeaders(b []byte) (*Headers, error) {
+func (r *Request) ParseHeaders(b []byte) (*Headers, int, error) {
 	// field-line   = field-name ":" OWS field-value OWS
 	read := 0
-	idx := 0
+	n := 0
 	header := []byte{}
 	headers := newHerders()
 	var err error = nil
 
 	for {
-		idx = bytes.Index(b[read:], RN)
-		if idx == -1 {
+		n = bytes.Index(b[read:], RN)
+		if n == -1 {
 			err = fmt.Errorf("idx == -1")
 			break
 		}
-		if idx == 0 {
+		if n == 0 {
 			break
 		}
-		header = b[read : read+idx]
+		header = b[read : read+n]
 		key, value, ok := bytes.Cut(header, []byte(":"))
 		if !ok {
 			err = ERROR_HEADER_NO_SEMICOLON
@@ -225,23 +225,23 @@ func (r *Request) ParseHeaders(b []byte) (*Headers, error) {
 		headers.Set(key, value)
 		err = validKey(key)
 		if err != nil {
-			return nil, ERROR_INVALID_HEADER_KEY
+			return nil, 0, ERROR_INVALID_HEADER_KEY
 		}
-		read += idx + len(RN)
+		read += n + len(RN)
 	}
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return headers, err
+	return headers, n, err
 }
 
-func (r *Request) ParseBody(b []byte) (*Body, error) {
+func (r *Request) ParseBody(b []byte) (*Body, int, error) {
 	ln := len(b)
 	return &Body{
 		Body:          b,
 		ContentLength: ln,
-	}, nil
+	}, ln, nil
 }
 
 func toInt(s string) (int, error) {
@@ -252,70 +252,70 @@ func toInt(s string) (int, error) {
 	return i, nil
 }
 
-func ParseRequest(req io.Reader) (*Request, error) {
-	// TODO: as of now, we are reading all the data at once, we
-	// can be more efficient by reading in chunks until we hit a  or a "\r\n\r\n"
-	// so we want to make the ParseRequest method able to get data, check if it has all
-	// it needs in order to parse it, if so - send a signel to not get any more data and start parsing,
-	// if not, instaed of return an error - ask for more data.
-	r := newRequest()
-	buff, err := io.ReadAll(req)
-
-	if err != nil {
-		r.State = ParserError
-		return nil, err
-	}
-
-	n := bytes.Index(buff, RN)
-	if n == -1 {
-		r.State = ParserError
-		return nil, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
-	}
-	n += len(RN)
-	rl, err := r.ParseRequestLine(buff[:n])
-	if err != nil {
-		r.State = ParserError
-		return nil, err
-	}
-	r.State = parserRL
-	r.RequestLine = *rl
-	// Headers
-	h_idx := bytes.Index(buff[n:], RNRN)
-	if h_idx == -1 {
-		r.State = ParserError
-		return nil, fmt.Errorf("headers not terminated by RNRN")
-	}
-
-	headers, err := r.ParseHeaders(buff[n : n+h_idx+len(RNRN)])
-	if err != nil {
-		r.State = ParserError
-		return nil, err
-	}
-	r.State = parserHeaders
-
-	cl, err := headers.Get("content-length")
-	if err == nil {
-		i, converr := toInt(cl)
-		if converr != nil {
-			r.State = ParserError
-			return nil, fmt.Errorf("Cant get content length: %s", converr)
+func (req *Request) parse(data []byte) (int, error) {
+	read := 0
+	var err error = nil
+outer:
+	for {
+		currend := data[read:]
+		switch req.State {
+		case parserInit:
+			// go parse the rl
+			rl, n, err := req.ParseRequestLine(currend)
+			if err != nil {
+				req.State = ParserError
+				break
+			}
+			read += n
+			req.RequestLine = *rl
+			req.State = parserHeaders
+		case parserHeaders:
+			headers, n, err := req.ParseHeaders(currend)
+			if err != nil {
+				req.State = ParserError
+				break
+			}
+			read += n
+			req.Headers = *headers
+			req.State = parserBody
+		case parserBody:
+			body, n, err := req.ParseBody(currend)
+			if err != nil {
+				req.State = ParserError
+				break
+			}
+			read += n
+			req.Body = *body
+			req.State = parserDone
+		case ParserError:
+			break outer
+		case parserDone:
+			return 0, err
 		}
-		r.Body.ContentLength = i
-	} else {
-		r.Body.ContentLength = 0
 	}
-	r.Headers = *headers
-	// Body
-	if r.Body.ContentLength != 0 {
-		bodyStart := n + h_idx + len(RNRN)
-		body, err := r.ParseBody(buff[bodyStart:])
+	return read, nil
+}
+
+func ParseRequest(reader io.Reader) (*Request, error) {
+	// take in a reader and send it to a parder method
+	var err error = nil
+	req := newRequest()
+	bufflen := 0
+	buff := make([]byte, 1024)
+	for {
+		// read into the buff, staring from the bufflen
+		n, err := reader.Read(buff[bufflen:])
 		if err != nil {
-			r.State = ParserError
-			return nil, err
+			break
 		}
-		r.Body = *body
+		bufflen += n
+		nParse, err := req.parse(buff[:bufflen])
+		if err != nil {
+			break
+		}
+		copy(buff, buff[nParse:bufflen])
+		bufflen = bufflen - nParse
 	}
-	r.State = parserDone
 
-	return r, nil
+	return req, err
 }
