@@ -268,7 +268,8 @@ outer:
 				req.State = ParserError
 				break
 			}
-			read += n
+			read = read + n
+			read += len(RN)
 			req.RequestLine = *rl
 			req.State = parserHeaders
 		case parserHeaders:
@@ -277,7 +278,7 @@ outer:
 				req.State = ParserError
 				break
 			}
-			read += n
+			read = read + n + len(RNRN)
 			req.Headers = *headers
 			req.State = parserBody
 		case parserBody:
@@ -286,7 +287,7 @@ outer:
 				req.State = ParserError
 				break
 			}
-			read += n
+			read = read + n
 			req.Body = *body
 			req.State = parserDone
 		case ParserError:
