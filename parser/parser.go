@@ -199,21 +199,23 @@ func validKey(b []byte) error {
 func (r *Request) ParseHeaders(b []byte) (*Headers, int, error) {
 	// field-line   = field-name ":" OWS field-value OWS
 	read := 0
-	n := 0
 	header := []byte{}
 	headers := newHerders()
 	var err error = nil
 
 	for {
-		n = bytes.Index(b[read:], RNRN)
+		n := bytes.Index(b[read:], RN)
 		if n == -1 {
 			err = fmt.Errorf("idx == -1")
 			break
 		}
 		if n == 0 {
+			// this means that we are at the last \r\n that sets the end of the headers
+			read += len(RN)
 			break
 		}
-		header = b[:n]
+		header = b[read : read+n]
+		read += n + len(RN)
 		key, value, ok := bytes.Cut(header, []byte(":"))
 		if !ok {
 			err = ERROR_HEADER_NO_COLON
@@ -228,9 +230,9 @@ func (r *Request) ParseHeaders(b []byte) (*Headers, int, error) {
 		headers.Set(key, value)
 		err = validKey(key)
 		if err != nil {
-			return nil, 0, ERROR_INVALID_HEADER_KEY
+			err = ERROR_INVALID_HEADER_KEY
+			break
 		}
-		read = read + n
 	}
 	if err != nil {
 		return nil, 0, err
@@ -277,7 +279,7 @@ outer:
 				req.State = ParserError
 				break
 			}
-			read = read + n + len(RNRN)
+			read += n
 			req.Headers = *headers
 			req.State = parserBody
 
@@ -305,7 +307,7 @@ outer:
 }
 
 func ParseRequest(reader io.Reader) (*Request, error) {
-	// take in a reader and send it to a parder method
+	// take in a reader and send it to a parser method
 	var err error = nil
 	req := newRequest()
 	bufflen := 0
