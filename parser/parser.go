@@ -63,6 +63,8 @@ func newRequest() *Request {
 
 // request-line   = method SP request-target SP HTTP-version
 func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, int, error) {
+	read := 0
+	// get the method view
 	n := bytes.Index(rl, SP)
 	if n == -1 {
 		r.State = ParserError
@@ -72,41 +74,42 @@ func (r *Request) ParseRequestLine(rl []byte) (*RequestLine, int, error) {
 		r.State = ParserError
 		return nil, 0, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
 	}
+	// where can the method be found
 	method := rl[:n]
-	n += len(SP)
 	if bytes.HasPrefix(method, SP) {
 		r.State = ParserError
 		return nil, 0, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_METHOD
 	}
 	method = bytes.ToUpper(method)
+	read += n + len(SP)
 
-	target_idx := bytes.Index(rl[n:], SP)
-	if target_idx == -1 {
+	n = bytes.Index(rl[read:], SP)
+	if n == -1 {
 		r.State = ParserError
 		return nil, 0, ERROR_NO_EMPTY_SPACE_IN_REQUEST_LINE
 	}
-	target := rl[n : target_idx+n]
+	target := rl[read : read+n]
 	if len(target) < 1 {
 		r.State = ParserError
 		return nil, 0, ERROR_NO_EMPTY_SPACE_ALLOWED_BEFORE_TARGET
 	}
-	after_target_idx := target_idx + n + len(SP)
-
-	version_idx := bytes.Index(rl[after_target_idx:], RN)
-	if version_idx == -1 {
+	read += n + len(SP)
+	n = bytes.Index(rl[read:], RN)
+	if n == -1 {
 		r.State = ParserError
 		return nil, 0, ERROR_INVALID_HTTP_VERSION
 	}
-	version, err := r.RequestLine.ParseVersion(rl[after_target_idx : after_target_idx+version_idx])
+	version, err := r.RequestLine.ParseVersion(rl[read : read+n])
 	if err != nil {
 		r.State = ParserError
 		return nil, 0, err
 	}
+	read += len(version)
 	return &RequestLine{
 		Method:  method,
 		Target:  target,
 		Version: version,
-	}, n, nil
+	}, read, nil
 }
 
 func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
@@ -123,7 +126,6 @@ func (l *RequestLine) ParseVersion(v []byte) ([]byte, error) {
 			return nil, ERROR_INVALID_HTTP_VERSION
 		}
 	}
-
 	return fmt.Appendf(nil, "%s/%s", http, v), nil
 }
 
