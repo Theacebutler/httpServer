@@ -268,6 +268,7 @@ outer:
 			rl, n, err := req.ParseRequestLine(current)
 			if err != nil {
 				req.State = ParserError
+				break outer
 			}
 			read = read + n
 			read += len(RN)
@@ -312,7 +313,7 @@ func ParseRequest(reader io.Reader) (*Request, error) {
 	req := newRequest()
 	bufflen := 0
 	buff := make([]byte, 1024)
-	for {
+	for req.State != parserDone && req.State != ParserError {
 		// read into the buff, staring from the bufflen
 		n, err := reader.Read(buff[bufflen:])
 		if err != nil {
