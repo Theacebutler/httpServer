@@ -296,13 +296,13 @@ outer:
 			read = read + n
 			req.Body = *body
 			req.State = parserDone
+		case parserDone:
+			return read, err
 		case ParserError:
 			break outer
-		case parserDone:
-			return 0, err
 		}
 	}
-	return read, nil
+	return 0, err
 }
 
 func ParseRequest(reader io.Reader) (*Request, error) {
