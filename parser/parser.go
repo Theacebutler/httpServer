@@ -56,7 +56,9 @@ var RNRN = []byte("\r\n\r\n")
 var SP = []byte(" ")
 
 func newRequest() *Request {
-	return &Request{}
+	return &Request{
+		State: parserInit,
+	}
 }
 
 // request-line   = method SP request-target SP HTTP-version
