@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"httpServer/parser"
 	"log"
-	"log/slog"
 	"net"
 )
 
@@ -17,17 +16,11 @@ func main() {
 	for {
 		conn, err := listnr.Accept()
 		if err != nil {
-			slog.Info("DEBUG", "stage", "error while opening listener")
 			fmt.Printf("error, closing connection...\r\n")
 			break
 		}
 		req, err := parser.ParseRequest(conn)
-		data := []byte{}
-		n, err := conn.Read(data)
-		slog.Info("DEBUG", "conn", data[n])
-		slog.Info("DEBUG", "stage", "parsed Request")
 		if err != nil {
-			slog.Info("DEBUG", "stage", "parser error")
 			log.Fatal(err)
 			break
 		}
