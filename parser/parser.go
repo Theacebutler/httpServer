@@ -213,7 +213,7 @@ func (r *Request) ParseHeaders(b []byte) (*Headers, int, error) {
 		if n == 0 {
 			break
 		}
-		header = b[read : read+n]
+		header = b[:n]
 		key, value, ok := bytes.Cut(header, []byte(":"))
 		if !ok {
 			err = ERROR_HEADER_NO_COLON
@@ -230,13 +230,12 @@ func (r *Request) ParseHeaders(b []byte) (*Headers, int, error) {
 		if err != nil {
 			return nil, 0, ERROR_INVALID_HEADER_KEY
 		}
-		read += n + len(RN)
+		read = read + n
 	}
 	if err != nil {
 		return nil, 0, err
 	}
-
-	return headers, n, err
+	return headers, read, err
 }
 
 func (r *Request) ParseBody(b []byte) (*Body, int, error) {
