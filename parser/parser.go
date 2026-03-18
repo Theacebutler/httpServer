@@ -259,11 +259,11 @@ func (req *Request) parse(data []byte) (int, error) {
 	var err error = nil
 outer:
 	for {
-		currend := data[read:]
+		current := data[read:]
 		switch req.State {
 		case parserInit:
 			// go parse the rl
-			rl, n, err := req.ParseRequestLine(currend)
+			rl, n, err := req.ParseRequestLine(current)
 			if err != nil {
 				req.State = ParserError
 				break
@@ -272,7 +272,7 @@ outer:
 			req.RequestLine = *rl
 			req.State = parserHeaders
 		case parserHeaders:
-			headers, n, err := req.ParseHeaders(currend)
+			headers, n, err := req.ParseHeaders(current)
 			if err != nil {
 				req.State = ParserError
 				break
@@ -281,7 +281,7 @@ outer:
 			req.Headers = *headers
 			req.State = parserBody
 		case parserBody:
-			body, n, err := req.ParseBody(currend)
+			body, n, err := req.ParseBody(current)
 			if err != nil {
 				req.State = ParserError
 				break
