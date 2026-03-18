@@ -144,8 +144,8 @@ func (h *Headers) Get(key string) (string, error) {
 }
 
 func (h *Headers) Set(k []byte, v []byte) {
-	key, value := string(k), string(v)
-	key = strings.ToLower(key)
+	key := strings.ToLower(string(k))
+	value := strings.ToLower(string(v))
 	value = strings.TrimSpace(value)
 	old, err := h.Get(key)
 	if err != nil {
