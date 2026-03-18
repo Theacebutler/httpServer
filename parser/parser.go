@@ -266,7 +266,6 @@ outer:
 			rl, n, err := req.ParseRequestLine(current)
 			if err != nil {
 				req.State = ParserError
-				break
 			}
 			read = read + n
 			read += len(RN)
