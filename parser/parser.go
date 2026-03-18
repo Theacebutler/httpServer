@@ -281,7 +281,13 @@ outer:
 			read = read + n + len(RNRN)
 			req.Headers = *headers
 			req.State = parserBody
+
 		case parserBody:
+			cl, err := req.Headers.Get("content-length")
+			if err != nil || cl == "0" {
+				req.State = parserDone
+				break
+			}
 			body, n, err := req.ParseBody(current)
 			if err != nil {
 				req.State = ParserError
