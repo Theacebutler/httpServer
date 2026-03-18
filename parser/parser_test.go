@@ -65,7 +65,7 @@ func TestRequestLineParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rl, err := r.ParseRequestLine([]byte(tt.input))
+			rl, _, err := r.ParseRequestLine([]byte(tt.input))
 			if tt.wantErr != nil {
 				require.Error(t, err)
 				assert.Equal(t, tt.wantErr, err)
@@ -136,7 +136,7 @@ func TestHeadersParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			headers, err := r.ParseHeaders([]byte(tt.input))
+			headers, _, err := r.ParseHeaders([]byte(tt.input))
 			if tt.wantErr != nil {
 				require.Error(t, err)
 				assert.Equal(t, tt.wantErr, err)
@@ -157,12 +157,11 @@ func TestHeadersParsing(t *testing.T) {
 func TestBodyParsing(t *testing.T) {
 	r := newRequest()
 	input := []byte("hello world")
-	body, err := r.ParseBody(input)
+	body, _, err := r.ParseBody(input)
 	require.NoError(t, err)
 	assert.Equal(t, 11, body.ContentLength)
 	assert.Equal(t, input, body.Body)
 }
-
 func TestFullRequestParsing(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -209,6 +208,7 @@ func TestFullRequestParsing(t *testing.T) {
 		})
 	}
 }
+
 func TestParseVersion(t *testing.T) {
 	rl := &RequestLine{}
 	tests := []struct {
