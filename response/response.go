@@ -1,7 +1,7 @@
 package response
 
 /* This is the package that creates the response and gives it to the server
-* to serve it back over the line, it has handler and writer, the handler is
+* to serve it back over the line, it has handler and writer methods, the handler is
 * implemented by the end user - it tells the writer what to write based on the
 * request it gets. And the writer function - it takes in a io writer/ a []byte
 * buff to write the request line, headers and body and returns the response
@@ -45,5 +45,3 @@ func newResponse() *Response {
 	}
 	return &Response{Writer: w}
 }
-
-func handler(r *parser.Request)
