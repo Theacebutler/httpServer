@@ -196,7 +196,6 @@ func validKey(b []byte) error {
 	return nil
 }
 
-// set the content_length
 func (r *Request) ParseHeaders(b []byte) (*Headers, int, error) {
 	// field-line   = field-name ":" OWS field-value OWS
 	read := 0
@@ -206,7 +205,7 @@ func (r *Request) ParseHeaders(b []byte) (*Headers, int, error) {
 	var err error = nil
 
 	for {
-		n = bytes.Index(b[read:], RN)
+		n = bytes.Index(b[read:], RNRN)
 		if n == -1 {
 			err = fmt.Errorf("idx == -1")
 			break
