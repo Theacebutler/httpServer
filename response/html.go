@@ -1,4 +1,4 @@
-package server
+package response
 
 func Respons200() []byte {
 	return []byte(`<html>
